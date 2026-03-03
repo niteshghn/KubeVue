@@ -14,7 +14,11 @@
       {
         "title": "KubeVue",
         "width": 1400,
-        "height": 900
+        "height": 900,
+        "decorations": true,
+        "resizable": true,
+        "minWidth": 800,
+        "minHeight": 600
       }
     ],
     "security": {
