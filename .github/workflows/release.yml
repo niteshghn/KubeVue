@@ -50,11 +50,8 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Install Tauri CLI
-        run: npm install -g @tauri-apps/cli@^2
-
       - name: Build Tauri app
-        run: cargo tauri build --target ${{ matrix.target }}
+        run: npx tauri build --target ${{ matrix.target }}
         env:
           TAURI_SIGNING_PRIVATE_KEY: ''
 
