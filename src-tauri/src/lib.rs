@@ -1,7 +1,8 @@
 mod kube;
 
 use kube::config::ClusterContext;
-use kube::resources::ResourceSummary;
+use kube::resources::{ResourceSummary, ResourceEvent};
+use kube::metrics::PodMetricsResult;
 use kube::port_forward::PortForwardSession;
 
 #[tauri::command]
@@ -24,6 +25,12 @@ async fn list_resources(context: String, kind: String, namespace: String) -> Res
 async fn get_resource_yaml(context: String, kind: String, name: String, namespace: String) -> Result<String, String> {
     let client = kube::client::get_client(&context).await.map_err(|e| e.to_string())?;
     kube::resources::get_resource_yaml(client, &kind, &name, &namespace).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_deployment_pods(context: String, name: String, namespace: String) -> Result<Vec<ResourceSummary>, String> {
+    let client = kube::client::get_client(&context).await.map_err(|e| e.to_string())?;
+    kube::resources::get_deployment_pods(client, &name, &namespace).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -58,6 +65,24 @@ async fn stream_logs(
     kube::logs::stream_logs(app, client, &pod, container.as_deref(), &namespace, follow, tail_lines)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_pod_metrics(context: String, name: String, namespace: String) -> Result<PodMetricsResult, String> {
+    let client = kube::client::get_client(&context).await.map_err(|e| e.to_string())?;
+    kube::metrics::get_pod_metrics(client, &name, &namespace).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_all_pod_metrics(context: String, namespace: String) -> Result<std::collections::HashMap<String, PodMetricsResult>, String> {
+    let client = kube::client::get_client(&context).await.map_err(|e| e.to_string())?;
+    kube::metrics::get_all_pod_metrics(client, &namespace).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_resource_events(context: String, kind: String, name: String, namespace: String) -> Result<Vec<ResourceEvent>, String> {
+    let client = kube::client::get_client(&context).await.map_err(|e| e.to_string())?;
+    kube::resources::get_resource_events(client, &kind, &name, &namespace).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -106,11 +131,15 @@ pub fn run() {
             list_namespaces,
             list_resources,
             get_resource_yaml,
+            get_deployment_pods,
+            get_resource_events,
             delete_resource,
             scale_deployment,
             restart_deployment,
             stream_logs,
             watch_resources,
+            get_pod_metrics,
+            get_all_pod_metrics,
             start_port_forward,
             stop_port_forward,
             list_port_forwards,

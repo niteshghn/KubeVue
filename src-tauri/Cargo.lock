@@ -2230,6 +2230,7 @@ dependencies = [
  "chrono",
  "dirs",
  "futures",
+ "http",
  "k8s-openapi",
  "kube",
  "lazy_static",

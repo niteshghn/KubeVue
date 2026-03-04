@@ -13,7 +13,8 @@ interface AppState {
   isLoading: boolean;
   error: string | null;
   selectedResource: ResourceSummary | null;
-  detailTab: "yaml" | "logs" | "events";
+  detailMode: boolean;
+  detailTab: "overview" | "yaml" | "logs" | "events";
 
   setContexts: (contexts: ClusterContext[]) => void;
   setActiveContext: (context: string) => void;
@@ -24,7 +25,9 @@ interface AppState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setSelectedResource: (resource: ResourceSummary | null) => void;
-  setDetailTab: (tab: "yaml" | "logs" | "events") => void;
+  setDetailResource: (resource: ResourceSummary) => void;
+  exitDetailMode: () => void;
+  setDetailTab: (tab: "overview" | "yaml" | "logs" | "events") => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -37,16 +40,19 @@ export const useAppStore = create<AppState>((set) => ({
   isLoading: false,
   error: null,
   selectedResource: null,
-  detailTab: "yaml",
+  detailMode: false,
+  detailTab: "overview",
 
   setContexts: (contexts) => set({ contexts }),
   setActiveContext: (activeContext) => set({ activeContext }),
   setNamespaces: (namespaces) => set({ namespaces }),
   setActiveNamespace: (activeNamespace) => set({ activeNamespace }),
-  setActiveKind: (activeKind) => set({ activeKind, selectedResource: null }),
+  setActiveKind: (activeKind) => set({ activeKind, selectedResource: null, detailMode: false }),
   setResources: (resources) => set({ resources }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
   setSelectedResource: (selectedResource) => set({ selectedResource }),
+  setDetailResource: (resource) => set({ selectedResource: resource, detailMode: true, detailTab: "overview" }),
+  exitDetailMode: () => set({ detailMode: false }),
   setDetailTab: (detailTab) => set({ detailTab }),
 }));

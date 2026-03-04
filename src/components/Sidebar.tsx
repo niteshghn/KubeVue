@@ -87,7 +87,7 @@ export function Sidebar() {
               onClick={() => setActiveKind(item.kind)}
               className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors ${
                 activeKind === item.kind
-                  ? "bg-[var(--accent)] bg-opacity-20 text-[var(--accent)]"
+                  ? "bg-[color:rgba(56,189,248,0.15)] text-[var(--accent)]"
                   : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
               }`}
             >

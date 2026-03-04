@@ -19,6 +19,27 @@ export interface ResourceSummary {
   raw: any;
 }
 
+export interface ResourceEvent {
+  event_type: string;
+  reason: string;
+  message: string;
+  count: number | null;
+  first_seen: string;
+  last_seen: string;
+  source: string;
+}
+
+export interface PodMetricsResult {
+  containers: ContainerMetrics[];
+  available: boolean;
+}
+
+export interface ContainerMetrics {
+  name: string;
+  cpu_nano: number;
+  memory_bytes: number;
+}
+
 export const api = {
   listContexts: () => invoke<ClusterContext[]>("list_contexts"),
   listNamespaces: (context: string) => invoke<string[]>("list_namespaces", { context }),
@@ -34,8 +55,16 @@ export const api = {
     invoke<void>("restart_deployment", { context, name, namespace }),
   streamLogs: (context: string, pod: string, container: string | null, namespace: string, follow: boolean, tailLines: number | null) =>
     invoke<void>("stream_logs", { context, pod, container, namespace, follow, tailLines }),
+  getDeploymentPods: (context: string, name: string, namespace: string) =>
+    invoke<ResourceSummary[]>("get_deployment_pods", { context, name, namespace }),
   watchResources: (context: string, kind: string, namespace: string) =>
     invoke<void>("watch_resources", { context, kind, namespace }),
+  getResourceEvents: (context: string, kind: string, name: string, namespace: string) =>
+    invoke<ResourceEvent[]>("get_resource_events", { context, kind, name, namespace }),
+  getPodMetrics: (context: string, name: string, namespace: string) =>
+    invoke<PodMetricsResult>("get_pod_metrics", { context, name, namespace }),
+  getAllPodMetrics: (context: string, namespace: string) =>
+    invoke<Record<string, PodMetricsResult>>("get_all_pod_metrics", { context, namespace }),
 };
 
 export const events = {

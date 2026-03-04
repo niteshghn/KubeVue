@@ -226,6 +226,62 @@ async fn list_events(client: Client, namespace: &str, lp: &ListParams) -> Result
     Ok(summaries)
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ResourceEvent {
+    pub event_type: String,
+    pub reason: String,
+    pub message: String,
+    pub count: Option<i32>,
+    pub first_seen: String,
+    pub last_seen: String,
+    pub source: String,
+}
+
+pub async fn get_resource_events(
+    client: Client,
+    kind: &str,
+    name: &str,
+    namespace: &str,
+) -> Result<Vec<ResourceEvent>, anyhow::Error> {
+    // Map display kind to K8s involvedObject.kind
+    let api_kind = match kind {
+        "PVC" => "PersistentVolumeClaim",
+        k => k,
+    };
+
+    let field_selector = format!("involvedObject.name={},involvedObject.kind={}", name, api_kind);
+    let lp = ListParams::default().fields(&field_selector);
+    let api: Api<Event> = Api::namespaced(client, namespace);
+    let events = api.list(&lp).await?;
+
+    let mut result: Vec<ResourceEvent> = events.items.into_iter().map(|e| {
+        let last_ts = e.last_timestamp.as_ref()
+            .map(|t| t.0.to_rfc3339())
+            .or_else(|| e.metadata.creation_timestamp.as_ref().map(|t| t.0.to_rfc3339()))
+            .unwrap_or_default();
+        let first_ts = e.first_timestamp.as_ref()
+            .map(|t| t.0.to_rfc3339())
+            .or_else(|| e.metadata.creation_timestamp.as_ref().map(|t| t.0.to_rfc3339()))
+            .unwrap_or_default();
+        let source = e.source.as_ref()
+            .and_then(|s| s.component.clone())
+            .unwrap_or_default();
+        ResourceEvent {
+            event_type: e.type_.unwrap_or_else(|| "Normal".to_string()),
+            reason: e.reason.unwrap_or_default(),
+            message: e.message.unwrap_or_default(),
+            count: e.count,
+            first_seen: first_ts,
+            last_seen: last_ts,
+            source,
+        }
+    }).collect();
+
+    // Sort newest first
+    result.sort_by(|a, b| b.last_seen.cmp(&a.last_seen));
+    Ok(result)
+}
+
 pub async fn get_resource_yaml(
     client: Client,
     kind: &str,
@@ -243,8 +299,77 @@ pub async fn get_resource_yaml(
             let dep = api.get(name).await?;
             Ok(serde_json::to_string_pretty(&dep)?)
         }
+        "services" => {
+            let api: Api<Service> = Api::namespaced(client, namespace);
+            let svc = api.get(name).await?;
+            Ok(serde_json::to_string_pretty(&svc)?)
+        }
+        "configmaps" => {
+            let api: Api<ConfigMap> = Api::namespaced(client, namespace);
+            let cm = api.get(name).await?;
+            Ok(serde_json::to_string_pretty(&cm)?)
+        }
+        "secrets" => {
+            let api: Api<Secret> = Api::namespaced(client, namespace);
+            let secret = api.get(name).await?;
+            Ok(serde_json::to_string_pretty(&secret)?)
+        }
+        "ingresses" => {
+            let api: Api<Ingress> = Api::namespaced(client, namespace);
+            let ing = api.get(name).await?;
+            Ok(serde_json::to_string_pretty(&ing)?)
+        }
+        "pvcs" => {
+            let api: Api<PersistentVolumeClaim> = Api::namespaced(client, namespace);
+            let pvc = api.get(name).await?;
+            Ok(serde_json::to_string_pretty(&pvc)?)
+        }
+        "events" => {
+            let api: Api<Event> = Api::namespaced(client, namespace);
+            let event = api.get(name).await?;
+            Ok(serde_json::to_string_pretty(&event)?)
+        }
         _ => Err(anyhow::anyhow!("Unknown kind: {}", kind)),
     }
+}
+
+pub async fn get_deployment_pods(
+    client: Client,
+    name: &str,
+    namespace: &str,
+) -> Result<Vec<ResourceSummary>, anyhow::Error> {
+    let dep_api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+    let dep = dep_api.get(name).await?;
+    let match_labels = dep.spec
+        .and_then(|s| s.selector.match_labels)
+        .unwrap_or_default();
+
+    let label_selector = match_labels
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let lp = ListParams::default().labels(&label_selector);
+    let pod_api: Api<Pod> = Api::namespaced(client, namespace);
+    let pods = pod_api.list(&lp).await?;
+
+    let summaries = pods.items.into_iter().map(|pod| {
+        let status = pod.status.as_ref()
+            .and_then(|s| s.phase.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+        let meta = &pod.metadata;
+        ResourceSummary {
+            name: meta.name.clone().unwrap_or_default(),
+            namespace: meta.namespace.clone(),
+            kind: "Pod".to_string(),
+            status,
+            age: calculate_age(meta.creation_timestamp.as_ref()),
+            labels: meta.labels.clone().unwrap_or_default(),
+            raw: serde_json::to_value(&pod).unwrap_or_default(),
+        }
+    }).collect();
+    Ok(summaries)
 }
 
 pub async fn delete_resource(
